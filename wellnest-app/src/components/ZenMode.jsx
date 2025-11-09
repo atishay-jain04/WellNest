@@ -9,21 +9,41 @@ import oceanWavesBg from '../assets/zenBackground/Ocean_waves.jpg';
 import mountainPeaceBg from '../assets/zenBackground/Mountain_peace.jpg';
 import rainfallCalmBg from '../assets/zenBackground/raining_calm.jpg';
 
+// Import Forest Serenity music
+import forestBirdsRiver from '../assets/music/forestSerenity/birds-forest-river-409229.mp3';
+import forestAmbience from '../assets/music/forestSerenity/forest-ambience-296528.mp3';
+import forestBirds from '../assets/music/forestSerenity/forestbirds-319791.mp3';
+
+// Import Ocean Waves music
+import oceanWavesLoop from '../assets/music/OceanWaves/mixkit-sea-waves-loop-1196.wav';
+import oceanBeachWaves from '../assets/music/OceanWaves/ocean-beach-waves-332383.mp3';
+import oceanWaves from '../assets/music/OceanWaves/ocean-waves-250310.mp3';
+
+// Import Mountain Peace music
+import mountainStream from '../assets/music/MountainPeace/the-sound-of-a-mountain-stream-_nature-sound-201930.mp3';
+import forestPath from '../assets/music/MountainPeace/forest-path-avala-mountains-246781.mp3';
+
+// Import Raining Calm music
+import calmingRain from '../assets/music/RainingCalm/calming-rain-257596.mp3';
+import gentleRain from '../assets/music/RainingCalm/gentle-rain-for-relaxation-and-sleep-337279.mp3';
+import rainSound from '../assets/music/RainingCalm/rain-sound-188158.mp3';
+
 const ZenMode = () => {
   const [selectedTheme, setSelectedTheme] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [currentMusicUrl, setCurrentMusicUrl] = useState('');
   const audioRef = useRef(null);
 
-  // Define 4 zen themes
+  // Define 4 zen themes with their music arrays
   const themes = [
     {
       id: 1,
       name: 'Forest Serenity',
       caption: 'Phone Down, Let\'s enjoy life',
       backgroundImage: forestSerenityBg,
-      sound: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3c6d84f7e.mp3',
+      musicFiles: [forestBirdsRiver, forestAmbience, forestBirds],
       icon: PiTreePalmLight
     },
     {
@@ -31,7 +51,7 @@ const ZenMode = () => {
       name: 'Ocean Waves',
       caption: 'Phone Down, Let\'s enjoy life',
       backgroundImage: oceanWavesBg,
-      sound: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
+      musicFiles: [oceanWavesLoop, oceanBeachWaves, oceanWaves],
       icon: PiWavesLight
     },
     {
@@ -39,7 +59,7 @@ const ZenMode = () => {
       name: 'Mountain Peace',
       caption: 'Phone Down, Let\'s enjoy life',
       backgroundImage: mountainPeaceBg,
-      sound: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_4deafeec1a.mp3',
+      musicFiles: [mountainStream, forestPath],
       icon: PiMountainsLight
     },
     {
@@ -47,7 +67,7 @@ const ZenMode = () => {
       name: 'Rainfall Calm',
       caption: 'Phone Down, Let\'s enjoy life',
       backgroundImage: rainfallCalmBg,
-      sound: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_bb630cc098.mp3',
+      musicFiles: [calmingRain, gentleRain, rainSound],
       icon: PiCloudRainLight
     }
   ];
@@ -76,27 +96,37 @@ const ZenMode = () => {
     if (!isFullscreen) {
       // Enter fullscreen
       setIsFullscreen(true);
-      if (audioRef.current && selectedTheme) {
-        audioRef.current.src = selectedTheme.sound;
-        audioRef.current.loop = true;
-        audioRef.current.volume = 0.7; // Set initial volume to 70%
+      
+      // Wait for next tick to ensure component is rendered
+      setTimeout(() => {
+        if (audioRef.current && selectedTheme) {
+          // Select a random music file from the theme's music array
+          const randomIndex = Math.floor(Math.random() * selectedTheme.musicFiles.length);
+          const selectedMusic = selectedTheme.musicFiles[randomIndex];
+          
+          setCurrentMusicUrl(selectedMusic);
+          
+          audioRef.current.src = selectedMusic;
+          audioRef.current.loop = true;
+          audioRef.current.volume = 0.7;
+          audioRef.current.load();
 
-        // Small delay to ensure audio is loaded before playing
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.play()
-              .then(() => {
-                console.log('✅ Audio playing successfully');
-                setIsPlaying(true);
-              })
-              .catch(err => {
-                console.error('❌ Audio play failed:', err);
-                console.log('🔔 Click the Play button to start audio');
-                setIsPlaying(false);
-              });
-          }
-        }, 100);
-      }
+          // Try to play after load
+          audioRef.current.addEventListener('canplaythrough', () => {
+            const playPromise = audioRef.current.play();
+            if (playPromise !== undefined) {
+              playPromise
+                .then(() => {
+                  setIsPlaying(true);
+                })
+                .catch(err => {
+                  console.error('Audio play failed:', err);
+                  setIsPlaying(false);
+                });
+            }
+          }, { once: true });
+        }
+      }, 200);
     } else {
       // Exit fullscreen
       exitZenMode();
@@ -105,14 +135,17 @@ const ZenMode = () => {
 
   // Exit zen mode
   const exitZenMode = () => {
-    // Stop audio first
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.src = ''; // Clear the source
-    }
-    setIsPlaying(false);
     setIsFullscreen(false);
+    setIsPlaying(false);
+    
+    // Stop audio after state updates
+    setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.src = ''; // Clear the source
+      }
+    }, 50);
   };
 
   // Toggle play/pause
@@ -121,17 +154,19 @@ const ZenMode = () => {
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
-        console.log('⏸️ Audio paused');
       } else {
-        audioRef.current.play()
-          .then(() => {
-            setIsPlaying(true);
-            console.log('▶️ Audio playing');
-          })
-          .catch(err => {
-            console.error('❌ Audio play error:', err);
-            alert('Unable to play audio. Please check your browser settings and network connection.');
-          });
+        audioRef.current.load();
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+            })
+            .catch(err => {
+              console.error('Audio play error:', err);
+              setIsPlaying(false);
+            });
+        }
       }
     }
   };
@@ -148,7 +183,7 @@ const ZenMode = () => {
   if (isFullscreen && selectedTheme) {
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center transition-all duration-500 bg-cover bg-center"
+        className="fixed inset-0 z-100 flex flex-col items-center justify-center transition-all duration-500 bg-cover bg-center"
         style={{
           backgroundImage: `url(${selectedTheme.backgroundImage})`,
           backgroundColor: 'rgba(0,0,0,0.3)',
@@ -218,9 +253,6 @@ const ZenMode = () => {
         <audio
           ref={audioRef}
           preload="auto"
-          onLoadStart={() => console.log('🔄 Loading audio...')}
-          onCanPlay={() => console.log('✅ Audio ready to play')}
-          onError={(e) => console.error('❌ Audio error:', e)}
         />
       </div>
     );
