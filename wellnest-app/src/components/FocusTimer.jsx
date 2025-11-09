@@ -167,30 +167,24 @@ const FocusTimer = () => {
             {/* Settings Form */}
             <div className="space-y-6">
               {Object.entries(tempPresets).map(([key, preset]) => (
-                <div key={key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
-                    {preset.label}
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={preset.time}
-                      onChange={(e) => handlePresetTimeChange(key, e.target.value)}
-                      disabled={key === 'pomodoro'}
-                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
-                        key === 'pomodoro'
-                          ? 'bg-gray-100 border-gray-200 cursor-not-allowed text-gray-500'
-                          : 'border-gray-200 focus:border-accent focus:outline-none'
-                      }`}
-                    />
-                    <span className="text-gray-600 font-medium">minutes</span>
+                key !== 'pomodoro' && (
+                  <div key={key}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                      {preset.label}
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={preset.time}
+                        onChange={(e) => handlePresetTimeChange(key, e.target.value)}
+                        className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-accent focus:outline-none transition-all duration-300"
+                      />
+                      <span className="text-gray-600 font-medium">minutes</span>
+                    </div>
                   </div>
-                  {key === 'pomodoro' && (
-                    <p className="text-xs text-gray-500 mt-1">Pomodoro duration is fixed at 25 minutes</p>
-                  )}
-                </div>
+                )
               ))}
             </div>
 

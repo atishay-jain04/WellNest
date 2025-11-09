@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { HiOutlineChatBubbleLeftRight } from 'react-icons/hi2';
 import { IoSend } from 'react-icons/io5';
+import { BiBot } from 'react-icons/bi';
+import geminiService from '../services/geminiService';
 
 const WellnessChatbot = () => {
   const [messages, setMessages] = useState([
@@ -12,9 +14,17 @@ const WellnessChatbot = () => {
     }
   ]);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [useGemini, setUseGemini] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Rule-based responses
+  // Initialize Gemini on component mount
+  useEffect(() => {
+    const isInitialized = geminiService.initialize();
+    setUseGemini(isInitialized);
+  }, []);
+
+  // Rule-based fallback responses
   const responses = {
     stress: [
       "Try taking 5 deep breaths. Inhale for 4 counts, hold for 4, exhale for 4.",
@@ -48,7 +58,7 @@ const WellnessChatbot = () => {
     ]
   };
 
-  const getBotResponse = (userMessage) => {
+  const getFallbackResponse = (userMessage) => {
     const lowerMessage = userMessage.toLowerCase();
 
     if (lowerMessage.includes('stress') || lowerMessage.includes('stressed')) {
@@ -70,30 +80,71 @@ const WellnessChatbot = () => {
     }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (inputText.trim() === '') return;
 
     // Add user message
     const userMessage = {
-      id: messages.length + 1,
+      id: Date.now(),
       text: inputText,
       sender: 'user',
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
     setInputText('');
+    setIsLoading(true);
 
-    // Simulate bot typing delay
-    setTimeout(() => {
-      const botMessage = {
-        id: messages.length + 2,
-        text: getBotResponse(inputText),
-        sender: 'bot',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, botMessage]);
-    }, 1000);
+    // Use setTimeout to ensure state updates complete
+    setTimeout(async () => {
+      try {
+        let botResponseText;
+
+        // Try Gemini API first if available
+        if (useGemini && geminiService.isAvailable()) {
+          try {
+            console.log('🟢 Using Gemini API for:', currentInput);
+            botResponseText = await geminiService.generateResponse(currentInput);
+            console.log('🟢 Got response from Gemini:', botResponseText);
+          } catch (error) {
+            console.error('🔴 Gemini API error, falling back to rule-based:', error);
+            botResponseText = getFallbackResponse(currentInput);
+          }
+        } else {
+          console.log('🟡 Using fallback responses');
+          botResponseText = getFallbackResponse(currentInput);
+        }
+
+        console.log('🟣 Final response text:', botResponseText);
+        console.log('🟣 Response type:', typeof botResponseText);
+        console.log('🟣 Response truthy:', !!botResponseText);
+
+        // Add bot response
+        const botMessage = {
+          id: Date.now() + 1,
+          text: botResponseText || 'Sorry, I had trouble generating a response.',
+          sender: 'bot',
+          timestamp: new Date()
+        };
+
+        console.log('🟣 Created message:', botMessage);
+
+        setMessages(prev => [...prev, botMessage]);
+        setIsLoading(false);
+
+      } catch (error) {
+        console.error('🔴 Error getting response:', error);
+        const errorMessage = {
+          id: Date.now() + 1,
+          text: "I'm having trouble processing that right now. Please try again.",
+          sender: 'bot',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        setIsLoading(false);
+      }
+    }, 100);
   };
 
   const handleKeyPress = (e) => {
@@ -123,16 +174,23 @@ const WellnessChatbot = () => {
           <HiOutlineChatBubbleLeftRight className="text-5xl text-gray-700" />
           <h1 className="text-4xl font-bold text-gray-800">Wellness Chatbot</h1>
         </div>
-        <p className="text-gray-600 text-lg">
-          Your personal wellness companion
-        </p>
+        <div className="flex items-center justify-center gap-2">
+          <p className="text-gray-600 text-lg">
+            Your personal wellness companion
+          </p>
+          {useGemini && (
+            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+              AI Powered
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Chat Container */}
       <div className="flex-1 bg-gray-50 rounded-3xl p-6 mb-4 overflow-y-auto">
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <div
-            key={message.id}
+            key={`${message.id}-${index}`}
             className={`flex mb-4 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
@@ -142,10 +200,23 @@ const WellnessChatbot = () => {
                   : 'bg-white text-gray-800 shadow-md'
               }`}
             >
-              <p className="text-sm leading-relaxed">{message.text}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-line">{message.text}</p>
             </div>
           </div>
         ))}
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="flex justify-start mb-4">
+            <div className="bg-white text-gray-800 shadow-md px-6 py-3 rounded-3xl">
+              <div className="flex items-center gap-2">
+                <BiBot className="text-xl animate-pulse" />
+                <span className="text-sm">Thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -174,14 +245,15 @@ const WellnessChatbot = () => {
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyPress={handleKeyPress}
+          disabled={isLoading}
           placeholder="Type your message..."
-          className="flex-1 px-6 py-4 rounded-full bg-gray-100 border-2 border-gray-200 focus:border-accent focus:outline-none transition-all duration-300"
+          className="flex-1 px-6 py-4 rounded-full bg-gray-100 border-2 border-gray-200 focus:border-accent focus:outline-none transition-all duration-300 disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={inputText.trim() === ''}
+          disabled={inputText.trim() === '' || isLoading}
           className={`px-6 py-4 rounded-full font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2 ${
-            inputText.trim() === ''
+            inputText.trim() === '' || isLoading
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-accent text-white hover:bg-red-600'
           }`}

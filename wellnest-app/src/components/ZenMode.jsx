@@ -79,8 +79,23 @@ const ZenMode = () => {
       if (audioRef.current && selectedTheme) {
         audioRef.current.src = selectedTheme.sound;
         audioRef.current.loop = true;
-        audioRef.current.play().catch(err => console.log('Audio play failed:', err));
-        setIsPlaying(true);
+        audioRef.current.volume = 0.7; // Set initial volume to 70%
+
+        // Small delay to ensure audio is loaded before playing
+        setTimeout(() => {
+          if (audioRef.current) {
+            audioRef.current.play()
+              .then(() => {
+                console.log('✅ Audio playing successfully');
+                setIsPlaying(true);
+              })
+              .catch(err => {
+                console.error('❌ Audio play failed:', err);
+                console.log('🔔 Click the Play button to start audio');
+                setIsPlaying(false);
+              });
+          }
+        }, 100);
       }
     } else {
       // Exit fullscreen
@@ -90,12 +105,14 @@ const ZenMode = () => {
 
   // Exit zen mode
   const exitZenMode = () => {
-    setIsFullscreen(false);
-    setIsPlaying(false);
+    // Stop audio first
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      audioRef.current.src = ''; // Clear the source
     }
+    setIsPlaying(false);
+    setIsFullscreen(false);
   };
 
   // Toggle play/pause
@@ -104,9 +121,17 @@ const ZenMode = () => {
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
+        console.log('⏸️ Audio paused');
       } else {
-        audioRef.current.play().catch(err => console.log('Audio play failed:', err));
-        setIsPlaying(true);
+        audioRef.current.play()
+          .then(() => {
+            setIsPlaying(true);
+            console.log('▶️ Audio playing');
+          })
+          .catch(err => {
+            console.error('❌ Audio play error:', err);
+            alert('Unable to play audio. Please check your browser settings and network connection.');
+          });
       }
     }
   };
@@ -190,7 +215,13 @@ const ZenMode = () => {
           </button>
         </div>
 
-        <audio ref={audioRef} />
+        <audio
+          ref={audioRef}
+          preload="auto"
+          onLoadStart={() => console.log('🔄 Loading audio...')}
+          onCanPlay={() => console.log('✅ Audio ready to play')}
+          onError={(e) => console.error('❌ Audio error:', e)}
+        />
       </div>
     );
   }
